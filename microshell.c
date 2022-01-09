@@ -3,13 +3,6 @@ gcc -ansi -Wall -o microshell/microshell microshell/microshell.c
 ./microshell/microshell
 */
 
-/* informacje o autorze programu oraz jego funkcjonalnosci 
-void help(){
-
-}
-chdir("..");
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +18,28 @@ void help(){
     printf("\n+--------------------------------------------------+\n|                                                  |\n|               ### MicroShellSO ###               |\n|               Andrzej Jurga 477601               |\n|                                                  |\n|   help - displays help                           |\n|   cd [PATH] - allows to change working directory |\n|   exit - ends with MicroShell                    |\n|                                                  |\n+--------------------------------------------------+\n\n");
 }
 
+int countSpaces(char *text){
+    int spaceCount = 0;
+    int inQuotation = 0;
+    int i;
+    for(i = 0; i < strlen(text); i++)
+    {
+        if(text[i]=='\'' || text[i]=='\"')
+        {
+            if(inQuotation == 0)
+            {
+                inQuotation = 1;
+            }
+            else
+            {
+                inQuotation = 0;
+            }
+        }
+        if(text[i] == ' ' && inQuotation == 0)
+            spaceCount++;
+    }
+    return spaceCount;
+}
 int checkQuoats(char *text){
     int apostrophe = 0;
     int quote = 0;
@@ -54,11 +69,11 @@ int checkQuoats(char *text){
 }
 
 /*Convert input string to array of arguments*/
-void prepareArgsArray(char *argv[],char *text, char *temp){
+void prepareArgsArray(char *argv[], char *text, char *temp){
         int i = 0;
         int j = 0;
         int k = 0;
-        printf("%s\n",text);
+        /*printf("%s\n",text);*/
         while(text[i]!='\0')
         {
             if(text[i]=='\'' || text[i]=='\"')
@@ -68,7 +83,6 @@ void prepareArgsArray(char *argv[],char *text, char *temp){
                 k++;
                 while(text[i]!='\'' && text[i]!='\"')
                 {
-                    printf("WHILE: %c\n",text[i]);
                     temp[i-k] = text[i];
                     i++;
                 }
@@ -76,6 +90,11 @@ void prepareArgsArray(char *argv[],char *text, char *temp){
             }
             else
             {
+                if(text[i]==' ')
+                {
+                    i++;
+                    k++;
+                }
                 while(text[i]!=' ' && text[i]!='\0')
                 {
                     temp[i-k] = text[i];
@@ -83,10 +102,8 @@ void prepareArgsArray(char *argv[],char *text, char *temp){
                 }
             temp[i] = '\0';
             }
-            /*argv[j] = temp;*/
+            printf("%s\n", temp);
             strcpy(argv[j], temp);
-            /*printf("%s\n",temp);
-            printf("%s\n",argv[j]);*/
             memset(temp,0,MAX_INPUT);
             
             i++;
@@ -96,7 +113,7 @@ void prepareArgsArray(char *argv[],char *text, char *temp){
         argv[j] = NULL;
 }
 
-/*Try to recognize and run commend from user*/
+/*Try to recognize and run command from user*/
 void recoCommand(char *builtIn[], int length, char* argv[]){ 
     int i;
     for(i = 0; i<length; i++)
@@ -158,28 +175,11 @@ int main() {
         text[strlen(text)-1] = '\0'; /*Replace new line with end of line*/
         /*now input is ready*/
         if(checkQuoats(text)){
-
-            spaceCount = 0;
-            int inQuotation = 0;
             int i;
-            for(i = 0; i < strlen(text); i++)
-            {
-                if(text[i]=='\'' || text[i]=='\"')
-                {
-                    if(inQuotation == 0)
-                    {
-                        inQuotation = 1;
-                    }
-                    else
-                    {
-                        inQuotation = 0;
-                    }
-                }
-                if(text[i] == ' ' && inQuotation == 0)
-                    spaceCount++;
-
-            }
+            spaceCount = countSpaces(text);
+            
 printf("Space count: %d\n",spaceCount);
+
             argv = malloc((spaceCount + 2) * sizeof(char*));
             for (i = 0; i < (spaceCount + 2); i++)
                 argv[i] = malloc((MAX_INPUT+2) * sizeof(char));
