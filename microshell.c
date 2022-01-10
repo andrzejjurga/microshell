@@ -1,6 +1,7 @@
-/* kompiluj
+/* kompiluj 
 gcc -ansi -Wall -o microshell/microshell microshell/microshell.c
-./microshell/microshell
+./microshell/microshell 
+error po ponownym otwarciu pliku
 */
 
 #include <stdio.h>
@@ -10,13 +11,33 @@ gcc -ansi -Wall -o microshell/microshell microshell/microshell.c
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <pwd.h>
 
 #define MAX_INPUT 256
 
+void historyAdd()
+{
+    char fileName[MAX_INPUT];
+    char line[MAX_INPUT];
+    memset(fileName,0,MAX_INPUT);
+    char *historyFile = getenv("HOME");
+    strcpy(fileName, "/.microshellHistory");
+    strcat(historyFile, fileName);
+
+    FILE * file;
+    file = fopen(historyFile, "a");
+    printf("%s\n", fileName);
+    printf("%s\n", historyFile);
+    fprintf(file, "test\n");
+    fclose(file);
+    
+}
 
 void help(){
     printf("\n+--------------------------------------------------+\n|                                                  |\n|               ### MicroShellSO ###               |\n|               Andrzej Jurga 477601               |\n|                                                  |\n|   help - displays help                           |\n|   cd [PATH] - allows to change working directory |\n|   exit - ends with MicroShell                    |\n|                                                  |\n+--------------------------------------------------+\n\n");
 }
+
+int gethostname(char *name, size_t namelen);
 
 int countSpaces(char *text){
     int spaceCount = 0;
@@ -114,7 +135,7 @@ void prepareArgsArray(char *argv[], char *text, char *temp){
 }
 
 /*Try to recognize and run command from user*/
-void recoCommand(char *builtIn[], int length, char* argv[]){ 
+void recoCommand(char *builtIn[], int length, char* argv[], char *prevDirectory){ 
     int i;
     for(i = 0; i<length; i++)
     {
@@ -127,7 +148,15 @@ void recoCommand(char *builtIn[], int length, char* argv[]){
 
     if(i==0)
     {
-        chdir(argv[1]);
+        if(!strcmp(argv[1], "-"))
+        {
+            chdir(prevDirectory);
+        }
+        else
+        {
+            getcwd(prevDirectory, MAX_INPUT);
+            chdir(argv[1]);
+        }
         perror("ERROR");
     }
     else if(i==1)
@@ -149,7 +178,7 @@ void recoCommand(char *builtIn[], int length, char* argv[]){
         {
             /*execlp(argv[0], argv[0], NULL);*/
             execvp(argv[0], argv);
-            printf("Command '%s' not found.\n", argv[0]);
+            printf("\033[31mCommand '%s' not found.\n\033[0m", argv[0]);
         }
         wait(NULL);
     }
@@ -160,6 +189,11 @@ int main() {
    char text[MAX_INPUT];
    char path[MAX_INPUT];
    char temp[MAX_INPUT];
+   char *name;
+   char prevDirectory[MAX_INPUT];
+   getcwd(prevDirectory, MAX_INPUT);
+   char host[MAX_INPUT];
+   
    int spaceCount;
    /*List of native commends*/
    char **argv;
@@ -169,11 +203,16 @@ int main() {
 
 
     while(1){
-        getcwd(path, sizeof(path));
-        printf("[%s] $", path); /*Prompt*/
+        getcwd(path, sizeof(path)); 
+        name = getlogin();
+        gethostname(host, MAX_INPUT);
+        printf("\033[32m%s\033[0m@\033[34m%s\033[0m:\033[36m[%s]\033[0m$", name, host, path); /*Prompt*/
         fgets(text, MAX_INPUT, stdin); /*Get line*/
         text[strlen(text)-1] = '\0'; /*Replace new line with end of line*/
         /*now input is ready*/
+
+        historyAdd();
+
         if(checkQuoats(text)){
             int i;
             spaceCount = countSpaces(text);
@@ -192,11 +231,11 @@ printf("Space count: %d\n",spaceCount);
             printf("|\n");
         
         
-            recoCommand(builtIn, builtInCount, argv);
+            recoCommand(builtIn, builtInCount, argv, prevDirectory);
         }
         else
         {
-            printf("ERROR: please check \' and \" placement\n");
+            printf("\033[31mERROR: please check \' and \" placement\n\033[0m");
         }
     }
    
