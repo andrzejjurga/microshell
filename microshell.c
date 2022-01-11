@@ -1,7 +1,6 @@
 /* kompiluj 
 gcc -ansi -Wall -o microshell/microshell microshell/microshell.c
 ./microshell/microshell 
-error po ponownym otwarciu pliku
 */
 
 #include <stdio.h>
@@ -15,22 +14,49 @@ error po ponownym otwarciu pliku
 
 #define MAX_INPUT 256
 
-void historyAdd()
+void historyAdd(char *text)
 {
-    char fileName[MAX_INPUT];
-    char line[MAX_INPUT];
-    memset(fileName,0,MAX_INPUT);
-    char *historyFile = getenv("HOME");
-    strcpy(fileName, "/.microshellHistory");
-    strcat(historyFile, fileName);
+    if(strcmp(text, "history"))
+    {
+        char historyFile[MAX_INPUT];
+        memset(historyFile,0,MAX_INPUT);
+        strcpy(historyFile, getenv("HOME"));
+        strcat(historyFile, "/.microshellHistory");
+        FILE * file;
+        file = fopen(historyFile, "a");
+        fprintf(file, "%s\n", text);
+        fclose(file);
+    }
+}
 
+void historyPrint()
+{
+    char historyFile[MAX_INPUT];
+    memset(historyFile,0,MAX_INPUT);
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    strcpy(historyFile, getenv("HOME"));
+    strcat(historyFile, "/.microshellHistory");
+    FILE * file;
+    file = fopen(historyFile, "r");
+    
+    while ((read = getline(&line, &len, file)) != -1) {
+            printf("%s", line);
+        }
+    free(line);
+    fclose(file);
+}
+
+void historyDelete()
+{
+    char historyFile[MAX_INPUT];
+    memset(historyFile,0,MAX_INPUT);
+    strcpy(historyFile, getenv("HOME"));
+    strcat(historyFile, "/.microshellHistory");
     FILE * file;
     file = fopen(historyFile, "a");
-    printf("%s\n", fileName);
-    printf("%s\n", historyFile);
-    fprintf(file, "test\n");
-    fclose(file);
-    
+    remove(historyFile);
 }
 
 void help(){
@@ -167,6 +193,18 @@ void recoCommand(char *builtIn[], int length, char* argv[], char *prevDirectory)
     {
     exit(0);
     }
+    else if(i==3)
+        {
+            printf("in 3 else\n");
+            if(argv[1] != NULL && (strcmp(argv[1], "-d") || strcmp(argv[1], "--delete")))
+            {
+                historyDelete();
+            }
+            else
+            {
+                historyPrint();
+            }
+        }
     else if(i == length)
     {
         pid_t childPid = fork();
@@ -197,7 +235,7 @@ int main() {
    int spaceCount;
    /*List of native commends*/
    char **argv;
-   char *builtIn[] = {"cd", "help", "exit"}; 
+   char *builtIn[] = {"cd", "help", "exit", "history"}; 
    /*Number of supported commends*/
    int builtInCount = sizeof(builtIn)/sizeof(builtIn[0]); 
 
@@ -211,7 +249,7 @@ int main() {
         text[strlen(text)-1] = '\0'; /*Replace new line with end of line*/
         /*now input is ready*/
 
-        historyAdd();
+        historyAdd(text);
 
         if(checkQuoats(text)){
             int i;
