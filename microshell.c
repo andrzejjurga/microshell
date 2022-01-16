@@ -1,6 +1,13 @@
 /* kompiluj 
 gcc -ansi -Wall -o microshell/microshell microshell/microshell.c
-./microshell/microshell 
+./microshell/microshell
+
+sudo apt-get install libncurses5-dev libncursesw5-dev
+
+przetestować strzałki
+
+zaimplementowac more -> dodać flagi, ogarnąć wczytywanie bez znaku
+
 */
 
 #include <stdio.h>
@@ -11,8 +18,16 @@ gcc -ansi -Wall -o microshell/microshell microshell/microshell.c
 #include <sys/wait.h>
 #include <errno.h>
 #include <pwd.h>
+#include <sys/ioctl.h>
+
 
 #define MAX_INPUT 256
+#define ASCII_ESC 27
+
+int gethostname(char *name, size_t namelen);
+ssize_t getline(char **lineptr, size_t *n, FILE *stream);
+
+
 
 void historyAdd(char *text)
 {
@@ -48,22 +63,98 @@ void historyPrint()
     fclose(file);
 }
 
+void historySearch(char *search)
+{
+    char historyFile[MAX_INPUT];
+    memset(historyFile,0,MAX_INPUT);
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    strcpy(historyFile, getenv("HOME"));
+    strcat(historyFile, "/.microshellHistory");
+    FILE * file;
+    file = fopen(historyFile, "r");
+    
+    while ((read = getline(&line, &len, file)) != -1) {
+            if(strstr(line, search))
+                printf("%s", line);
+        }
+    free(line);
+    fclose(file);
+}
+
 void historyDelete()
 {
     char historyFile[MAX_INPUT];
     memset(historyFile,0,MAX_INPUT);
     strcpy(historyFile, getenv("HOME"));
     strcat(historyFile, "/.microshellHistory");
-    FILE * file;
-    file = fopen(historyFile, "a");
     remove(historyFile);
+    historyAdd("--History--");
 }
+
+int linesCount(char *filePath)
+{   
+    int counter = 0;
+    FILE * file;
+    int temp;
+    file = fopen(filePath, "r");
+    while(!feof(file))
+    {
+        temp = fgetc(file);
+        if(temp == '\n')
+            {
+                counter++;
+            }
+    }
+    fclose(file);
+    return counter;
+}
+
+void more()
+{
+    char filePath[MAX_INPUT];
+    char c;
+    strcpy(filePath, "/home/andrzej/more_test");
+    int i = 0, lineCounter = linesCount(filePath), printedLines = 0;
+    if(!lineCounter) printf("\033[31mError encountered!\n\033[0m");
+    else{
+        FILE * file;
+        file = fopen(filePath, "r");
+        char *line = NULL;
+        size_t len = 0;
+        ssize_t read;
+        while ((read = getline(&line, &len, file)) != -1 && i<5) 
+        {
+            c = 'z';
+            printf("%s", line);
+            printedLines++;
+            i++;
+            if(i == 5 && i>=printedLines)
+            {
+
+                printf("\033[0;42m--More--(%.1f%%)\033[0;0m", (float)printedLines/lineCounter*100);
+                c = getchar();
+                    getchar();
+                if(c!='q')
+                {
+                    i = 0;
+                }
+
+
+                printf( "%c[2K", ASCII_ESC );       
+            }
+        }
+        free(line);
+        fclose(file);
+    }
+}
+
 
 void help(){
-    printf("\n+--------------------------------------------------+\n|                                                  |\n|               ### MicroShellSO ###               |\n|               Andrzej Jurga 477601               |\n|                                                  |\n|   help - displays help                           |\n|   cd [PATH] - allows to change working directory |\n|   exit - ends with MicroShell                    |\n|                                                  |\n+--------------------------------------------------+\n\n");
+    printf("\n+--------------------------------------------------+\n|                                                  |\n|               ### MicroShellSO ###               |\n|               Andrzej Jurga 477601               |\n|                                                  |\n|   help - displays help                           |\n|   cd [PATH] - allows to change working directory |\n|   exit - ends with MicroShell                    |\n|   history - displays command history for         |\n|      current user                                |\n|      -d|--delete - delete history                |\n|      -s|--search [text] - search history         |\n|                                                  |\n+--------------------------------------------------+\n\n");
 }
 
-int gethostname(char *name, size_t namelen);
 
 int countSpaces(char *text){
     int spaceCount = 0;
@@ -91,7 +182,7 @@ int checkQuoats(char *text){
     int apostrophe = 0;
     int quote = 0;
     int i = 0;
-    int bool = 1;
+    int check = 1;
     while(text[i]!='\0')
     {
         if(text[i]=='\'')
@@ -99,20 +190,20 @@ int checkQuoats(char *text){
             if(quote % 2 == 0)
                 apostrophe++;
             else
-                bool = 0;
+                check = 0;
         }
         if(text[i]=='\"')
         {
             if(apostrophe % 2 == 0)
                 quote++;
             else
-                bool = 0;
+                check = 0;
         }
         i++;
     }
     if(quote % 2 != 0 || apostrophe % 2 != 0)
-        bool = 0;
-    return bool;
+        check = 0;
+    return check;
 }
 
 /*Convert input string to array of arguments*/
@@ -194,17 +285,25 @@ void recoCommand(char *builtIn[], int length, char* argv[], char *prevDirectory)
     exit(0);
     }
     else if(i==3)
+    {
+        printf("in 3 else\n");
+        if(argv[1] != NULL && (!strcmp(argv[1], "-d") || !strcmp(argv[1], "--delete")))
         {
-            printf("in 3 else\n");
-            if(argv[1] != NULL && (strcmp(argv[1], "-d") || strcmp(argv[1], "--delete")))
-            {
-                historyDelete();
-            }
-            else
-            {
-                historyPrint();
-            }
+            historyDelete();
         }
+        else if(argv[1] != NULL && (!strcmp(argv[1], "-s") || !strcmp(argv[1], "--search")))
+        {
+            historySearch(argv[2]);
+        }
+        else
+        {
+            historyPrint();
+        }
+    }
+    else if(i==4)
+    {
+    more();
+    }
     else if(i == length)
     {
         pid_t childPid = fork();
@@ -235,12 +334,13 @@ int main() {
    int spaceCount;
    /*List of native commends*/
    char **argv;
-   char *builtIn[] = {"cd", "help", "exit", "history"}; 
+   char *builtIn[] = {"cd", "help", "exit", "history", "more"}; 
    /*Number of supported commends*/
    int builtInCount = sizeof(builtIn)/sizeof(builtIn[0]); 
 
 
     while(1){
+        fflush(stdout);
         getcwd(path, sizeof(path)); 
         name = getlogin();
         gethostname(host, MAX_INPUT);
@@ -251,10 +351,10 @@ int main() {
 
         historyAdd(text);
 
-        if(checkQuoats(text)){
+        if(checkQuoats(text) && strcmp(text, "")){
             int i;
             spaceCount = countSpaces(text);
-            
+printf("text: %s\n",text);     
 printf("Space count: %d\n",spaceCount);
 
             argv = malloc((spaceCount + 2) * sizeof(char*));
@@ -271,7 +371,7 @@ printf("Space count: %d\n",spaceCount);
         
             recoCommand(builtIn, builtInCount, argv, prevDirectory);
         }
-        else
+        else if(strcmp(text, ""))
         {
             printf("\033[31mERROR: please check \' and \" placement\n\033[0m");
         }
